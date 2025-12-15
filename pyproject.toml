@@ -1,0 +1,31 @@
+# Khai báo dependencies 
+[project]
+name = "AD-OCV1"
+version = "0.1.0"
+description = "Lean Python REST API for PackVerify AI"
+authors = [{ name = "Van", email = "you@example.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.32.0",
+    "SQLAlchemy==2.0.36",
+    "alembic==1.13.2",
+    "pydantic==2.9.2",
+    "pydantic-settings==2.5.2",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[argon2]==1.7.4",
+    "python-dotenv==1.0.1",
+    "orjson==3.10.7",
+    "loguru==0.7.2",
+]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]

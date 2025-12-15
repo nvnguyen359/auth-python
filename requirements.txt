@@ -1,0 +1,32 @@
+# Web framework
+fastapi
+uvicorn[standard]
+
+# Database
+SQLAlchemy
+alembic
+
+# Data validation
+pydantic
+pydantic-settings
+
+# Security & Auth
+python-jose[cryptography]
+passlib[argon2]
+
+# Environment & Config
+python-dotenv
+tomli   # đọc file .toml
+
+# JSON & Performance
+orjson
+
+# Logging
+loguru
+
+# Testing
+pytest
+httpx
+
+# pip install -r requirements.txt
+# uvicorn app.main:app --reload

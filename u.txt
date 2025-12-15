@@ -1,0 +1,8 @@
+🔑 Giải thích
+reset_db.sh: xóa file SQLite cũ, tạo lại từ init.sql.
+
+load_sample.sh: nạp dữ liệu mẫu từ sample.sql.
+
+run_dev.sh: chạy server dev với reload.
+
+run_prod.sh: chạy server production bằng gunicorn.
