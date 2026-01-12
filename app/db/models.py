@@ -80,3 +80,13 @@ class Order(Base):
     user = relationship("User", back_populates="orders")
     camera = relationship("Camera", back_populates="orders")
     parent = relationship("Order", remote_side=[id])
+    
+    # app/db/models.py (Thêm vào cuối file)
+
+class Setting(Base):
+    __tablename__ = "settings"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    key = Column(String(100), unique=True, nullable=False, index=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=get_vn_time, onupdate=get_vn_time)
