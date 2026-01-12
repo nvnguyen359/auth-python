@@ -24,7 +24,7 @@ class Token(BaseModel):
 router = APIRouter()
 
 @router.post(
-    "/login",
+    "/api/login",
     response_model=Token,
     summary="User login (OAuth2 Form)",
     tags=["auth"]

@@ -1,55 +1,52 @@
-# CRUD user 
-# app/api/routers/user_router.py
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from app.db import schemas
 from app.db.session import get_db
-from app.services.user_service import UserService
-from app.core.security import hash_password
+from app.crud.user_crud import user_crud
 from app.utils.response import response_success
 
-router = APIRouter()
+router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("", response_model=dict)
 def create_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
-    # Hash mật khẩu trước khi create
-    user_in_dict = user_in.dict()
-    user_in_dict["password_hash"] = hash_password(user_in_dict.pop("password"))
-    # Chuyển qua schema cho CRUD (UserCreate không có password_hash -> map tạm thời)
-    create_obj = schemas.UserCreate(**{**user_in.dict()})
-    # Sửa lại service để nhận password_hash (workaround: dùng crud trực tiếp)
-    from app.crud.user_crud import user_crud
-    db_user = user_crud.create(db, schemas.UserCreate(**user_in.dict()))
-    # Sau khi tạo, cập nhật password_hash
-    db_user.password_hash = user_in_dict["password_hash"]
-    db.commit()
-    db.refresh(db_user)
-    return response_success(data=db_user)
+    # 1. Kiểm tra tồn tại
+    existing_user = user_crud.get_by_username(db, username=user_in.username)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Username already registered"
+        )
+
+    # 2. Tạo user (Logic hash password đã nằm trong CRUD như đã làm ở bước trước)
+    db_user = user_crud.create(db, obj_in=user_in)
+    
+    # 3. Chuyển đổi Model sang Dict để tránh lỗi PydanticSerializationError
+    data_response = jsonable_encoder(db_user)
+    
+    # Xóa password_hash khỏi data trả về để bảo mật (tùy chọn)
+    if "password_hash" in data_response:
+        del data_response["password_hash"]
+        
+    return response_success(data=data_response)
 
 @router.get("/{user_id}")
 def get_user(user_id: int, db: Session = Depends(get_db)):
-    svc = UserService(db)
-    user = svc.get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return response_success(data=user)
-
-@router.patch("/{user_id}")
-def update_user(user_id: int, user_in: schemas.UserUpdate, db: Session = Depends(get_db)):
-    svc = UserService(db)
-    user = svc.update_user(user_id, user_in)
+    user = user_crud.get(db, id=user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return response_success(data=user)
 
 @router.post("/{user_id}/activate")
 def activate_user(user_id: int, db: Session = Depends(get_db)):
-    svc = UserService(db)
-    user = svc.activate_user(user_id)
+    user = user_crud.activate(db, user_id=user_id)
+    if not user:
+         raise HTTPException(status_code=404, detail="User not found")
     return response_success(data=user)
 
 @router.post("/{user_id}/deactivate")
 def deactivate_user(user_id: int, db: Session = Depends(get_db)):
-    svc = UserService(db)
-    user = svc.deactivate_user(user_id)
+    user = user_crud.deactivate(db, user_id=user_id)
+    if not user:
+         raise HTTPException(status_code=404, detail="User not found")
     return response_success(data=user)
