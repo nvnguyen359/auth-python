@@ -1,130 +1,115 @@
 # AD-OCV1/app/main.py
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.openapi.utils import get_openapi
-from fastapi.staticfiles import StaticFiles
+import os
+import uvicorn
 from pathlib import Path
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_swagger_ui_html
 from starlette.middleware.cors import CORSMiddleware
-from app.api.routers import auth_router, user_router, camera_router, order_router
-from app.core.auth_middleware import AuthMiddleware
+
+# --- Import nội bộ ---
 from app.core.config import settings
-import threading
-from app.db.session import get_db # Hàm trả về generator cho DB Session
+from app.core.auth_middleware import AuthMiddleware
+from app.core.router_loader import auto_include_routers
+from app.core.openapi_config import configure_openapi
+from app.db.session import get_db
 from app.services.camera_management_service import run_camera_upsert_loop
 from scripts.check_db import main as check_db_main
-# Khởi tạo ứng dụng FastAPI với các thông tin chung (metadata)
+import threading
+
+# 1. Định nghĩa đường dẫn tới thư mục client
+# Đi lên 2 cấp từ app/main.py để về root, sau đó vào client/browser
+BASE_DIR = Path(__file__).resolve().parent.parent
+CLIENT_DIR = BASE_DIR / "client" / "browser"
+
+# 2. Khởi tạo App
 app = FastAPI(
     title="AD-OCV1 API Documentation",
     version="1.0.0",
-    description="API Documentation for the AD-OCV1 project - User, Camera, and Order Management System.",
-    openapi_tags=[
-        {"name": "auth", "description": "Authentication and Token Generation (Login, Get User Info)."},
-        {"name": "users", "description": "User CRUD and Account Management (Requires Admin/Supervisor)."},
-        {"name": "cameras", "description": "Camera Device CRUD and Connection Status."},
-        {"name": "orders", "description": "Order/Session Management and Tracking."},
-    ]
+    description="API Documentation for the AD-OCV1 project.",
+    docs_url=None, # Tắt docs mặc định để tự cấu hình bên dưới
+    redoc_url=None
 )
 
-# Thêm Middleware CORS
+# 3. Cấu hình Middleware
 app.add_middleware(
     CORSMiddleware,
-    # SỬA LỖI TẠI ĐÂY: Thay CORS_ORIGINS.split(",") bằng settings.allowed_origins
-    allow_origins=settings.allowed_origins, 
+    allow_origins=settings.ALLOWED_ORIGINS, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Thêm Middleware xác thực tùy chỉnh
 app.add_middleware(AuthMiddleware)
 
-# Mount Static files (CSS cho Swagger UI)
-app.mount(
-    "/static",
-    StaticFiles(directory=Path(__file__).parent / "docs"),
-    name="static",
-)
+# 4. Load Routers & Config
+auto_include_routers(app)
+configure_openapi(app)
 
-# Thêm các Router
-# Lưu ý: Nếu auth_router có prefix, cần thêm vào đây. Hiện tại không có prefix.
-app.include_router(auth_router.router, tags=["auth"]) 
-app.include_router(user_router.router, prefix="/users", tags=["users"])
-app.include_router(camera_router.router, prefix="/cameras", tags=["cameras"])
-app.include_router(order_router.router, prefix="/orders", tags=["orders"])
-
-
-# Định nghĩa cơ chế OpenAPI tùy chỉnh để thêm Security Scheme
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    
-    # Lấy lược đồ tự động sinh
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-        tags=app.openapi_tags
-    )
-# SỬA LỖI: Thay đổi Security Scheme sang OAuth2 Password Flow
-    # Điều này sẽ hiển thị form Username/Password khi bấm "Authorize"
-    openapi_schema["components"]["securitySchemes"] = {
-        "OAuth2PasswordBearer": {
-            "type": "oauth2",
-            "flows": {
-                "password": {
-                    "tokenUrl": "/login",  # Đường dẫn API login để Swagger gửi user/pass tới
-                    "scopes": {}
-                }
-            }
-        }
-    }
-    
-    # Áp dụng yêu cầu xác thực cho tất cả các Path
-    for path, path_item in openapi_schema["paths"].items():
-        for method_info in path_item.values():
-            tags = method_info.get("tags", [])
-            
-            # Áp dụng security cho các endpoint KHÔNG thuộc tag 'auth'
-            if tags and "auth" not in tags:
-                method_info["security"] = [{"OAuth2PasswordBearer": []}]
-            
-            # Xử lý riêng cho endpoint "/me" (nằm trong tag "auth" nhưng cần xác thực)
-            if tags and "auth" in tags and path.endswith("/me"):
-                method_info["security"] = [{"OAuth2PasswordBearer": []}]
-                
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
-
+# 5. Startup Events
 @app.on_event("startup")
 async def startup_event():
-    check_db_main()# Gọi hàm main() từ scripts/check_db.py tạo db
-    # Chạy vòng lặp upsert camera mỗi 5 giây trong luồng riêng
+    check_db_main()
     camera_thread = threading.Thread(
         target=run_camera_upsert_loop, 
-        args=(get_db, 5), # Truyền hàm get_db (factory) và khoảng thời gian
+        args=(get_db, 5),
         daemon=True
     )
     camera_thread.start()
 
-# Tùy chỉnh Swagger UI HTML để load CSS
+# 6. Custom Swagger UI
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "docs"), name="static_docs")
+
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def custom_swagger_ui_html(request: Request):
-    # Đường dẫn đến file CSS tùy chỉnh của bạn
-    swagger_css_url = request.url_for("static", path="swagger_style.css")
-
-    # Hàm lấy HTML mặc định của Swagger UI (tự động)
-    from fastapi.openapi.docs import get_swagger_ui_html
-    html_content = get_swagger_ui_html(
+    return get_swagger_ui_html(
         openapi_url=app.openapi_url,
         title=app.title + " - Swagger UI",
-        swagger_css_url=swagger_css_url
+        swagger_css_url=request.url_for("static_docs", path="swagger_style.css")
     )
-    return html_content
 
-# Endpoint gốc
-@app.get("/", include_in_schema=False)
-async def root():
-    return {"message": "Welcome to AD-OCV1 API. See documentation at /docs"}
+# ==========================================
+# CẤU HÌNH SERVE FRONTEND (CLIENT/BROWSER)
+# ==========================================
+
+# Kiểm tra thư mục client có tồn tại không để tránh lỗi crash
+if CLIENT_DIR.exists():
+    # Cách 1: Nếu client build ra folder 'assets' hoặc 'static' riêng (React/Vue thường làm thế này)
+    if (CLIENT_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=CLIENT_DIR / "assets"), name="assets")
+
+    # Cách 2: Route đặc biệt để phục vụ các file tĩnh nằm ngay ngoài cùng (như favicon.ico, robots.txt)
+    @app.get("/{file_path:path}", include_in_schema=False)
+    async def serve_static_files(file_path: str):
+        file_location = CLIENT_DIR / file_path
+        # Nếu là file tồn tại -> trả về file
+        if file_location.is_file():
+            return FileResponse(file_location)
+        # Nếu không tìm thấy file và không phải API -> trả về index.html (cho SPA routing)
+        # Lưu ý: Các API routers đã được check trước ở trên, nên không sợ bị đè.
+        return FileResponse(CLIENT_DIR / "index.html")
+
+    # Route gốc: Trả về index.html
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return FileResponse(CLIENT_DIR / "index.html")
+else:
+    # Fallback nếu chưa có thư mục client
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return {"message": "Client directory not found. Please build frontend to 'client/browser'"}
+
+# ==========================================
+# CHẠY APP VỚI CONFIG TỪ .ENV
+# ==========================================
+if __name__ == "__main__":
+    print(f"🚀 Starting server at http://{settings.HOST}:{settings.PORT}")
+    print(f"📂 Serving client from: {CLIENT_DIR}")
+    
+    uvicorn.run(
+        "app.main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.RELOAD
+    )

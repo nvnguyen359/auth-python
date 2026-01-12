@@ -1,13 +1,12 @@
-# Tạo session kết nối DB 
 # app/db/session.py
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# Tạo engine từ DB_URL trong .env
+# SỬA LỖI: Đổi settings.db_url thành settings.DB_URL để khớp với config.py
 engine = create_engine(
-    settings.db_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.db_url else {},
+    settings.DB_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in settings.DB_URL else {},
     pool_pre_ping=True,
 )
 

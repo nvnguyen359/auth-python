@@ -32,7 +32,7 @@ class UserOut(UserBase):
 
     class Config:
         # Cập nhật cho Pydantic v1. Dùng from_attributes=True cho Pydantic v2
-        orm_mode = True 
+        from_attributes = True
 
 
 # =========================

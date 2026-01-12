@@ -42,7 +42,6 @@ class Camera(Base):
     device_path = Column(String(255))
     status = Column(String(50))
     os_index= Column(Integer, default=0)
-    # Quan hệ: 1 camera có nhiều orders
     orders = relationship("Order", back_populates="camera")
 
 
@@ -66,8 +65,6 @@ class Order(Base):
     path_video = Column(String(255))
     order_metadata = Column(Text)
     note = Column(Text)
-
-    # Quan hệ ngược
     user = relationship("User", back_populates="orders")
     camera = relationship("Camera", back_populates="orders")
     parent = relationship("Order", remote_side=[id])

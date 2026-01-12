@@ -21,10 +21,10 @@ CREATE TABLE IF NOT EXISTS cameras (
     prefer_gst INTEGER DEFAULT 0,
     is_connected INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    device_path TEXT
+    device_path TEXT,  -- Đã thêm dấu phẩy ở đây
     os_index INTEGER DEFAULT 0
-
 );
+
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     camera_id INTEGER,
@@ -45,5 +45,3 @@ CREATE TABLE IF NOT EXISTS orders (
     FOREIGN KEY(parent_id) REFERENCES orders(id) ON DELETE SET NULL,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
-
-ALTER TABLE cameras ADD COLUMN os_index INTEGER DEFAULT 0;
