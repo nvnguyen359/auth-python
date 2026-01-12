@@ -18,16 +18,16 @@ def create_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Username already registered"
         )
 
-    # 2. Tạo user (Logic hash password đã nằm trong CRUD như đã làm ở bước trước)
+    # 2. Tạo user (Logic hash password nằm trong CRUD)
     db_user = user_crud.create(db, obj_in=user_in)
     
-    # 3. Chuyển đổi Model sang Dict để tránh lỗi PydanticSerializationError
+    # 3. Chuyển đổi sang JSON-compatible dict (Sẽ xử lý luôn cả datetime)
     data_response = jsonable_encoder(db_user)
     
-    # Xóa password_hash khỏi data trả về để bảo mật (tùy chọn)
-    if "password_hash" in data_response:
-        del data_response["password_hash"]
-        
+    # Bảo mật: Xóa hash password
+    data_response.pop("password_hash", None)
+    
+    # Đảm bảo trả về múi giờ Việt Nam trong response
     return response_success(data=data_response)
 
 @router.get("/{user_id}")

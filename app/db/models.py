@@ -1,9 +1,12 @@
-# Models: User, Camera, Order 
-# app/db/models.py
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import pytz
 from app.db.base import Base
+
+# Hàm lấy thời gian hiện tại theo múi giờ Việt Nam
+def get_vn_time():
+    return datetime.now(pytz.timezone('Asia/Ho_Chi_Minh'))
 
 # =========================
 # USER MODEL
@@ -17,7 +20,8 @@ class User(Base):
     full_name = Column(String(100))
     role = Column(String(20), default="operator")  # admin, supervisor, operator
     is_active = Column(Integer, default=1)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # Cập nhật default sang giờ Việt Nam
+    created_at = Column(DateTime, default=get_vn_time)
 
     # Quan hệ: 1 user có nhiều orders
     orders = relationship("Order", back_populates="user")
@@ -38,10 +42,13 @@ class Camera(Base):
     backend = Column(String(50))
     prefer_gst = Column(Integer, default=0)
     is_connected = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # Cập nhật default sang giờ Việt Nam
+    created_at = Column(DateTime, default=get_vn_time)
     device_path = Column(String(255))
     status = Column(String(50))
-    os_index= Column(Integer, default=0)
+    os_index = Column(Integer, default=0)
+
+    # Quan hệ: 1 camera có nhiều orders
     orders = relationship("Order", back_populates="camera")
 
 
@@ -58,13 +65,18 @@ class Order(Base):
     session_id = Column(String(100))
     code = Column(String(100), index=True)
     status = Column(String(20), default="packing")  # packing, closed, error
-    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Cập nhật default sang giờ Việt Nam cho tất cả các trường thời gian
+    created_at = Column(DateTime, default=get_vn_time)
     start_at = Column(DateTime)
     closed_at = Column(DateTime)
+    
     path_avatar = Column(String(255))
     path_video = Column(String(255))
     order_metadata = Column(Text)
     note = Column(Text)
+
+    # Relationships
     user = relationship("User", back_populates="orders")
     camera = relationship("Camera", back_populates="orders")
     parent = relationship("Order", remote_side=[id])
