@@ -56,7 +56,7 @@ def login_for_access_token(
         
     # 3. Tạo Access Token
     # Lưu ý: Đảm bảo file app/core/security.py đã được cập nhật để nhận expires_delta
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(
         subject=user.username,
         expires_delta=access_token_expires

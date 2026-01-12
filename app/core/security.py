@@ -1,36 +1,51 @@
-# JWT, Argon2 password hashing, role check 
 # app/core/security.py
+
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any, Union, Optional
 from jose import jwt, JWTError
-from passlib.hash import argon2
+from passlib.context import CryptContext
 from app.core.config import settings
 
-def hash_password(password: str) -> str:
-    return argon2.hash(password)
+# Cấu hình hash password
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
-def verify_password(password: str, password_hash: str) -> bool:
-    try:
-        return argon2.verify(password, password_hash)
-    except Exception:
-        return False
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Kiểm tra mật khẩu có khớp không"""
+    return pwd_context.verify(plain_password, hashed_password)
 
-def create_access_token(subject: str, expires_delta: timedelta = None) -> str:
-    """
-    Tạo JWT Token. 
-    Hỗ trợ tham số expires_delta (timedelta) để khớp với auth_router.
-    """
+def get_password_hash(password: str) -> str:
+    """Hash mật khẩu để lưu vào DB"""
+    return pwd_context.hash(password)
+
+# --- SỬA LỖI: Tạo alias (tên khác) cho hàm get_password_hash ---
+# Giúp code cũ gọi hash_password vẫn chạy bình thường
+hash_password = get_password_hash 
+
+def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None) -> str:
+    """Tạo JWT Token"""
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        # Mặc định lấy từ config nếu không truyền vào
-        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+        # Lưu ý: ACCESS_TOKEN_EXPIRE_MINUTES phải viết hoa theo config mới
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    payload = {"sub": subject, "exp": expire}
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    to_encode = {"exp": expire, "sub": str(subject)}
+    
+    encoded_jwt = jwt.encode(
+        to_encode, 
+        settings.JWT_SECRET, 
+        algorithm=settings.JWT_ALGORITHM
+    )
+    return encoded_jwt
 
-def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_access_token(token: str) -> Optional[dict]:
+    """Giải mã JWT Token để lấy thông tin user"""
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            token, 
+            settings.JWT_SECRET, 
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        return payload
     except JWTError:
         return None
