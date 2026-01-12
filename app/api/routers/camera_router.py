@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.services.camera_service import CameraService
 from app.utils.response import response_success
 
-router = APIRouter()
+router = APIRouter(prefix="/cameras", tags=["cameras"])
 
 # --- ĐỊNH NGHĨA MODEL MỚI CHO RESPONSE DANH SÁCH ---
 class CameraListResponse(BaseModel):
