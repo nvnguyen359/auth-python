@@ -27,7 +27,7 @@ CLIENT_DIR = APP_DIR.parent / "client" / "browser"
 
 # 2. Khởi tạo App
 app = FastAPI(
-    title="AD-OCV1 API Documentation",
+    title="API Documentation",
     version="1.0.0",
     docs_url=None, # Tắt URL mặc định
     redoc_url=None

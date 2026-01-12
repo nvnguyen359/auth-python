@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from fastapi.responses import HTMLResponse
-from fastapi.openapi.docs import get_swagger_ui_html
 
 def custom_swagger_ui_html_response(
     openapi_url: str,
